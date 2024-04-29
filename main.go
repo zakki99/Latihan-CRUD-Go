@@ -1,85 +1,89 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 )
 
-type Product struct {
-	ID    int
-	Code  string
-	Price int
+type Item struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
 }
 
-// Simpan data produk dalam slice
-var products []Product
-
-// Fungsi untuk menambahkan produk baru
-func createProduct(code string, price int) {
-	// Hitung ID berikutnya
-	nextID := len(products) + 1
-	// Tambahkan produk baru ke slice
-	products = append(products, Product{ID: nextID, Code: code, Price: price})
-}
-
-// Fungsi untuk membaca produk berdasarkan ID
-func readProduct(id int) *Product {
-	for _, p := range products {
-		if p.ID == id {
-			return &p
+func createFile(fileName string) error {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
+		file, err := os.Create(fileName)
+		if err != nil {
+			return err
 		}
+		defer file.Close()
 	}
 	return nil
 }
 
-// Fungsi untuk memperbarui produk berdasarkan ID
-func updateProduct(id int, code string, price int) {
-	for i, p := range products {
-		if p.ID == id {
-			// Update data produk
-			products[i].Code = code
-			products[i].Price = price
-			return
-		}
+func writeFile(fileName string, data []byte) error {
+	err := ioutil.WriteFile(fileName, data, 0644)
+	if err != nil {
+		return err
 	}
+	return nil
 }
 
-// Fungsi untuk menghapus produk berdasarkan ID
-func deleteProduct(id int) {
-	for i, p := range products {
-		if p.ID == id {
-			// Hapus produk dari slice
-			products = append(products[:i], products[i+1:]...)
-			return
-		}
+func readFile(fileName string) ([]byte, error) {
+	data, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return nil, err
 	}
+	return data, nil
+}
+
+func addItemToFile(fileName string, newItem Item) error {
+	data, err := readFile(fileName)
+	if err != nil {
+		return err
+	}
+
+	var items []Item
+	if err := json.Unmarshal(data, &items); err != nil {
+		return err
+	}
+
+	items = append(items, newItem)
+
+	newData, err := json.MarshalIndent(items, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	if err := writeFile(fileName, newData); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func main() {
-	// Menambahkan beberapa produk
-	createProduct("Laptop", 1000)
-	createProduct("Smartphone", 800)
+	fileName := "items.json"
 
-	// Mencetak produk
-	fmt.Println("List of Products:")
-	for _, p := range products {
-		fmt.Printf("ID: %d, Code: %s, Price: $%d\n", p.ID, p.Code, p.Price)
+	if err := createFile(fileName); err != nil {
+		fmt.Println("Error creating file:", err)
+		return
 	}
 
-	// Mencari produk berdasarkan ID
-	productID := 1
-	fmt.Printf("\nFinding Product with ID %d:\n", productID)
-	foundProduct := readProduct(productID)
-	if foundProduct != nil {
-		fmt.Printf("ID: %d, Code: %s, Price: $%d\n", foundProduct.ID, foundProduct.Code, foundProduct.Price)
-	} else {
-		fmt.Println("Product not found.")
+
+	newItem := Item{ID: 1, Name: "Item 1"}
+	if err := addItemToFile(fileName, newItem); err != nil {
+		fmt.Println("Error adding item to file:", err)
+		return
 	}
 
-	// Memperbarui produk
-	updateProduct(productID, "Updated Laptop", 1200)
-	fmt.Printf("\nProduct with ID %d updated.\n", productID)
-
-	// Menghapus produk
-	deleteProduct(productID)
-	fmt.Printf("\nProduct with ID %d deleted.\n", productID)
+	data, err := readFile(fileName)
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+	fmt.Println("File contents:")
+	fmt.Println(string(data))
 }
